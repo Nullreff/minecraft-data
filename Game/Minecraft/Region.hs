@@ -128,11 +128,11 @@ readAvailableRegions world = do
     return $ fmap fileToCoords regionFiles
     where
         isRegionFile = (== ".mcr") . takeExtension
-        fileToCoords regionFile = 
-            let fileName       = dropExtension regionFile 
-                (fileName', z) = splitExtension fileName
-                x              = takeExtension fileName'
-            in ((read . tail) x, (read . tail) z)
+        fileToCoords regionFile =                          -- r.x.z.mcr
+            let fileName       = dropExtension regionFile  -- r.x.z 
+                (fileName', z) = splitExtension fileName   -- r.x       .z
+                x              = takeExtension fileName'   --           .x
+            in ((read . tail) x, (read . tail) z)          -- (x, z)
 
 -- | Given 'RegionCoords', gives back the filename of the region file
 -- containing that region
