@@ -11,7 +11,9 @@ import qualified Data.Serialize.Builder as Builder
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word
+import Data.List.Split
 import System.FilePath
+import System.Directory
 
 import Data.NBT
 import Game.Minecraft.Block
@@ -95,6 +97,42 @@ instance Serialize Region where
 -- that chunk
 chunkToRegionCoords :: ChunkCoords -> RegionCoords
 chunkToRegionCoords (x, z) = (x `shift` (-5), z `shift` (-5))
+{--
+regionToChunk :: ByteString -> NBT
+regionToChunk regionData = 
+    let (Right (Region v)) = decode regionData
+        (Just (Chunk c))   = (V.!) v 1023
+        (Right nbt)        = decodeLazy c
+    in nbt
+--}
+
+-- | Converts a chunk into a list of block ids contained
+chunkToBlocks :: NBT -> [BlockId]
+chunkToBlocks (CompoundTag _ [(CompoundTag (Just "Level") ts)]) = 
+    let [(ByteArrayTag _ _ bs)] = filter (\t -> case t of (ByteArrayTag (Just "Blocks") _ _) -> True; _ -> False) ts
+    in map (toEnum . fromIntegral) (S.unpack bs)
+
+chunkToBlockColumns :: NBT -> [[[BlockId]]]
+chunkToBlockColumns = chunksOf 16 . chunksOf 128 . chunkToBlocks
+
+horzCrossSection :: Int -> [[[BlockId]]] -> [[BlockId]]
+horzCrossSection = fmap . fmap . flip (!!) 
+
+readRegion :: FilePath -> (Int, Int) -> IO (Either String Region)
+readRegion world coords = decode <$> S.readFile (world </> "region" </> regionFileName coords) 
+
+readAvailableRegions :: FilePath -> IO [(Int, Int)]
+readAvailableRegions world = do 
+    allFiles <- getDirectoryContents $ world </> "region"
+    let regionFiles = filter isRegionFile allFiles
+    return $ fmap fileToCoords regionFiles
+    where
+        isRegionFile = (== ".mcr") . takeExtension
+        fileToCoords regionFile = 
+            let fileName       = dropExtension regionFile 
+                (fileName', z) = splitExtension fileName
+                x              = takeExtension fileName'
+            in ((read . tail) x, (read . tail) z)
 
 -- | Given 'RegionCoords', gives back the filename of the region file
 -- containing that region
@@ -114,3 +152,9 @@ testBlocks = do (CompoundTag _ [(CompoundTag (Just "Level") ts)]) <- testChunk
 testBlockIds :: IO [BlockId]
 testBlockIds = do [(ByteArrayTag _ _ bs)] <- testBlocks
                   return (map (toEnum . fromIntegral) (S.unpack bs))
+
+testBlockColumns :: IO [[[BlockId]]]
+testBlockColumns = chunksOf 16 <$> chunksOf 128 <$> testBlockIds 
+
+testCrossSection :: Int -> IO [[BlockId]]
+testCrossSection level = (fmap . fmap . fmap) (!! level) testBlockColumns
