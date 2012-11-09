@@ -118,11 +118,11 @@ chunkToBlockColumns = chunksOf 16 . chunksOf 128 . chunkToBlocks
 horzCrossSection :: Int -> [[[BlockId]]] -> [[BlockId]]
 horzCrossSection = fmap . fmap . flip (!!) 
 
-readRegion :: FilePath -> (Int, Int) -> IO (Either String Region)
+readRegion :: FilePath -> RegionCoords -> IO (Either String Region)
 readRegion world coords = decode <$> S.readFile (world </> "region" </> regionFileName coords) 
 
-readAvailableRegions :: FilePath -> IO [(Int, Int)]
-readAvailableRegions world = do 
+readAvailableRegionCoords :: FilePath -> IO [RegionCoords]
+readAvailableRegionCoords world = do 
     allFiles <- getDirectoryContents $ world </> "region"
     let regionFiles = filter isRegionFile allFiles
     return $ fmap fileToCoords regionFiles
